@@ -7,6 +7,7 @@ add_subdirectory(HTTPD)
 add_subdirectory(maxscaled)
 add_subdirectory(MySQL)
 add_subdirectory(telnetd)
+add_subdirectory(noop)
 
 if(BUILD_TESTS)
   add_subdirectory(testprotocol)
