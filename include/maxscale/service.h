@@ -237,6 +237,7 @@ extern int serviceSessionCountAll();
 extern RESULTSET *serviceGetList();
 extern RESULTSET *serviceGetListenerList();
 extern bool service_all_services_have_listeners();
+extern int service_count_services();
 
 /**
  * Get the capabilities of the servive.

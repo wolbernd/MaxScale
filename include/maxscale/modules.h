@@ -69,7 +69,6 @@ extern  void    unload_all_modules();
 extern  void    printModules();
 extern  void    dprintAllModules(DCB *);
 extern  RESULTSET   *moduleGetList();
-extern void module_feedback_send(void*);
-extern void moduleShowFeedbackReport(DCB *dcb);
+extern  void    module_log_feedback_report();
 
 MXS_END_DECLS

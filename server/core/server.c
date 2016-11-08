@@ -1070,3 +1070,20 @@ bool server_set_version_string(SERVER* server, const char* string)
 
     return rval;
 }
+
+int server_count_servers()
+{
+    int i = 0;
+
+    spinlock_acquire(&server_spin);
+    SERVER *server = allServers;
+
+    while (server)
+    {
+        i++;
+        server = server->next;
+    }
+
+    spinlock_release(&server_spin);
+    return i;
+}

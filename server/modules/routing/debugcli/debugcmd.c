@@ -146,10 +146,6 @@ struct subcommand showoptions[] = {
       "Show the event statistics",
       "Show the event statistics",
       {0, 0, 0} },
-    { "feedbackreport", 0, moduleShowFeedbackReport,
-      "Show the report of MaxScale loaded modules, suitable for Notification Service",
-      "Show the report of MaxScale loaded modules, suitable for Notification Service",
-      {0, 0, 0} },
     { "filter", 1, dprintFilter,
       "Show details of a filter, called with a filter name",
       "Show details of a filter, called with the address of a filter",
@@ -441,8 +437,6 @@ static void enable_monitor_replication_heartbeat(DCB *dcb, MONITOR *monitor);
 static void disable_monitor_replication_heartbeat(DCB *dcb, MONITOR *monitor);
 static void enable_service_root(DCB *dcb, SERVICE *service);
 static void disable_service_root(DCB *dcb, SERVICE *service);
-static void enable_feedback_action();
-static void disable_feedback_action();
 static void enable_syslog();
 static void disable_syslog();
 static void enable_maxlog();
@@ -511,14 +505,6 @@ struct subcommand enableoptions[] = {
         "Enable root access to a service, pass a service name to enable root access",
         "Enable root access to a service, pass a service name to enable root access",
         {ARG_TYPE_SERVICE, 0, 0}
-    },
-    {
-        "feedback",
-        0,
-        enable_feedback_action,
-        "Enable MaxScale modules list sending via http to notification service",
-        "Enable MaxScale modules list sending via http to notification service",
-        {0, 0, 0}
     },
     {
         "syslog",
@@ -619,14 +605,6 @@ struct subcommand disableoptions[] = {
         "Disable root access to a service",
         "Disable root access to a service",
         {ARG_TYPE_SERVICE, 0, 0}
-    },
-    {
-        "feedback",
-        0,
-        disable_feedback_action,
-        "Disable MaxScale modules list sending via http to notification service",
-        "Disable MaxScale modules list sending via http to notification service",
-        {0, 0, 0}
     },
     {
         "syslog",
@@ -1831,29 +1809,6 @@ set_log_throttling(DCB *dcb, int count, int window_ms, int suppress_ms)
                    "where the X denotes how many times particular message may be logged "
                    "during a period of Y milliseconds before it is suppressed for Z milliseconds.");
     }
-}
-
-/**
- * Re-enable sendig MaxScale module list via http
- * Proper [feedback] section in MaxSclale.cnf
- * is required.
- */
-static void
-enable_feedback_action(void)
-{
-    config_enable_feedback_task();
-    return;
-}
-
-/**
- * Disable sendig MaxScale module list via http
- */
-
-static void
-disable_feedback_action(void)
-{
-    config_disable_feedback_task();
-    return;
 }
 
 /**

@@ -75,5 +75,6 @@ bool clean_up_pathname(char *path);
 bool mxs_mkdir_all(const char *path, int mask);
 
 long get_processor_count();
+long get_available_memory();
 
 MXS_END_DECLS

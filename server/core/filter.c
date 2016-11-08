@@ -494,3 +494,21 @@ filterUpstream(FILTER_DEF *filter, void *fsession, UPSTREAM *upstream)
     }
     return me;
 }
+
+int filter_count_filters()
+{
+    int i = 0;
+
+    spinlock_acquire(&filter_spin);
+
+    FILTER_DEF *filter = allFilters;
+
+    while (filter)
+    {
+        i++;
+        filter = filter->next;
+    }
+
+    spinlock_release(&filter_spin);
+    return i;
+}

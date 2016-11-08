@@ -45,6 +45,11 @@
 #include <maxscale/gwdirs.h>
 #include <maxscale/alloc.h>
 
+#include "maxscale/config.h"
+#include "maxscale/utils.h"
+#include <maxscale/service.h>
+#include <maxscale/server.h>
+
 static MODULES *registered = NULL;
 
 static MODULES *find_module(const char *module);
@@ -55,7 +60,6 @@ static void register_module(const char *module,
                             void        *modobj,
                             MODULE_INFO *info);
 static void unregister_module(const char *module);
-int module_create_feedback_report(GWBUF **buffer, MODULES *modules, FEEDBACK_CONF *cfg);
 int do_http_post(GWBUF *buffer, void *cfg);
 
 struct MemoryStruct
@@ -469,28 +473,6 @@ dprintAllModules(DCB *dcb)
 }
 
 /**
- * Print Modules to a DCB
- *
- * Diagnostic routine to display all the loaded modules
- */
-void
-moduleShowFeedbackReport(DCB *dcb)
-{
-    GWBUF *buffer;
-    MODULES *modules_list = registered;
-    FEEDBACK_CONF *feedback_config = config_get_feedback_data();
-
-    if (!module_create_feedback_report(&buffer, modules_list, feedback_config))
-    {
-        MXS_ERROR("Error in module_create_feedback_report(): gwbuf_alloc() failed to allocate memory");
-
-        return;
-    }
-    dcb_printf(dcb, "%s", (char *)GWBUF_DATA(buffer));
-    gwbuf_free(buffer);
-}
-
-/**
  * Provide a row to the result set that defines the set of modules
  *
  * @param set   The result set
@@ -570,148 +552,14 @@ moduleGetList()
     return set;
 }
 
-/**
- * Send loaded modules info to notification service
- *
- *  @param data The configuration details of notification service
- */
-void
-module_feedback_send(void* data)
-{
-    MODULES *modules_list = registered;
-    CURL *curl = NULL;
-    CURLcode res;
-    struct curl_httppost *formpost = NULL;
-    struct curl_httppost *lastptr = NULL;
-    GWBUF *buffer = NULL;
-    void *data_ptr = NULL;
-    long http_code = 0;
-    int last_action = _NOTIFICATION_SEND_PENDING;
-    time_t now;
-    struct tm *now_tm;
-    int hour;
-    int n_mod = 0;
-    char hex_setup_info[2 * SHA_DIGEST_LENGTH + 1] = "";
-    int http_send = 0;
-
-    now = time(NULL);
-    struct tm now_result;
-    now_tm = localtime_r(&now, &now_result);
-    hour = now_tm->tm_hour;
-
-    FEEDBACK_CONF *feedback_config = (FEEDBACK_CONF *) data;
-
-    /* Configuration check */
-
-    if (feedback_config->feedback_enable == 0 ||
-        feedback_config->feedback_url == NULL ||
-        feedback_config->feedback_user_info == NULL)
-    {
-        MXS_ERROR("Error in module_feedback_send(): some mandatory parameters are not set"
-                  " feedback_enable=%u, feedback_url=%s, feedback_user_info=%s",
-                  feedback_config->feedback_enable,
-                  feedback_config->feedback_url == NULL ? "NULL" : feedback_config->feedback_url,
-                  feedback_config->feedback_user_info == NULL ?
-                  "NULL" : feedback_config->feedback_user_info);
-
-        feedback_config->feedback_last_action = _NOTIFICATION_SEND_ERROR;
-
-        return;
-    }
-
-    /**
-     * Task runs nightly, from 2 AM to 4 AM
-     *
-     * If it's done in that time interval, it will be skipped
-     */
-
-    if (hour > 4 || hour < 2)
-    {
-        /* It's not the rigt time, mark it as to be done and return */
-        feedback_config->feedback_last_action = _NOTIFICATION_SEND_PENDING;
-
-        MXS_INFO("module_feedback_send(): execution skipped, current hour [%d]"
-                 " is not within the proper interval (from 2 AM to 4 AM)",
-                 hour);
-
-        return;
-    }
-
-    /* Time to run the task: if a previous run was succesfull skip next runs */
-    if (feedback_config->feedback_last_action == _NOTIFICATION_SEND_OK)
-    {
-        /* task was done before, return */
-
-        MXS_INFO("module_feedback_send(): execution skipped because of previous "
-                 "succesful run: hour is [%d], last_action [%d]",
-                 hour, feedback_config->feedback_last_action);
-
-        return;
-    }
-
-    MXS_INFO("module_feedback_send(): task now runs: hour is [%d], last_action [%d]",
-             hour, feedback_config->feedback_last_action);
-
-    if (!module_create_feedback_report(&buffer, modules_list, feedback_config))
-    {
-        MXS_ERROR("Error in module_create_feedback_report(): gwbuf_alloc() failed to allocate memory");
-
-        feedback_config->feedback_last_action = _NOTIFICATION_SEND_ERROR;
-
-        return;
-    }
-
-    /* try sending data via http/https post */
-    http_send = do_http_post(buffer, feedback_config);
-
-    if (http_send == 0)
-    {
-        feedback_config->feedback_last_action = _NOTIFICATION_SEND_OK;
-    }
-    else
-    {
-        feedback_config->feedback_last_action = _NOTIFICATION_SEND_ERROR;
-
-        MXS_INFO("Error in module_create_feedback_report(): do_http_post ret_code is %d", http_send);
-    }
-
-    MXS_INFO("module_feedback_send(): task completed: hour is [%d], last_action [%d]",
-             hour,
-             feedback_config->feedback_last_action);
-
-    gwbuf_free(buffer);
-
-}
 
 /**
- * Create the feedback report as string.
- * I t could be sent to notification service
- * or just printed via maxadmin/telnet
- *
- * @param buffe         The pointr for GWBUF allocation, to be freed by the caller
- * @param modules       The mouleds list
- * @param cfg           The feedback configuration
- * @return              0 on failure, 1 on success
- *
+ * Log a link to the feedback report.
  */
-
-int
-module_create_feedback_report(GWBUF **buffer, MODULES *modules, FEEDBACK_CONF *cfg)
+void module_log_feedback_report()
 {
-    MODULES *ptr = modules;
+    MODULES *ptr = registered;
     int n_mod = 0;
-    char *data_ptr = NULL;
-    char hex_setup_info[2 * SHA_DIGEST_LENGTH + 1] = "";
-    time_t now;
-    struct tm *now_tm;
-    int report_max_bytes = 0;
-
-    if (buffer == NULL)
-    {
-        return 0;
-    }
-
-    now = time(NULL);
 
     /* count loaded modules */
     while (ptr)
@@ -720,78 +568,52 @@ module_create_feedback_report(GWBUF **buffer, MODULES *modules, FEEDBACK_CONF *c
         n_mod++;
     }
 
+    /** Create a list of modules */
+    char modlist[n_mod * 255];
+    modlist[0] = '\0';
+
     /* module lists pointer is set back to the head */
-    ptr = modules;
+    ptr = registered;
 
-    /**
-     * allocate gwbuf for data to send
-     *
-     * each module gives 4 rows
-     * product and release rows add 7 rows
-     * row is _NOTIFICATION_REPORT_ROW_LEN bytes long
-     */
-
-    report_max_bytes = ((n_mod * 4) + 7) * (_NOTIFICATION_REPORT_ROW_LEN + 1);
-    *buffer = gwbuf_alloc(report_max_bytes);
-
-    if (*buffer == NULL)
+    if (ptr)
     {
-        return 0;
+        strcpy(modlist, ptr->module);
+        ptr = ptr->next;
+
+        while (ptr)
+        {
+            strcat(modlist, ",");
+            strcat(modlist, ptr->module);
+            ptr = ptr->next;
+        }
     }
+
+    GATEWAY_CONF *cnf = config_get_global_options();
+    FEEDBACK_CONF *fb = config_get_feedback_data();
 
     /* encode MAC-sha1 to HEX */
-    gw_bin2hex(hex_setup_info, cfg->mac_sha1, SHA_DIGEST_LENGTH);
+    char hex_setup_info[2 * SHA_DIGEST_LENGTH + 1] = "";
+    gw_bin2hex(hex_setup_info, cnf->mac_sha1, SHA_DIGEST_LENGTH);
 
-    data_ptr = (char *)GWBUF_DATA(*buffer);
+    const char *dest_url_format = "Please consider submitting an anonymous feedback report of MariaDB MaxScale:\n\n"
+        "www.mariadb.com/feedback?uid=%s&version=%s&system=%s&modules=%s&processors=%d"
+        "&memory=%d&servers=%d&services=%d&filters=%d\n\n"
+        "The unique identified is calculated from the SHA1 hash of the "
+        "MAC address of the first network inteface. We do not collect any "
+        "information that might be used to identify a user.";
 
-    snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "FEEDBACK_SERVER_UID\t%s\n", hex_setup_info);
-    data_ptr += strlen(data_ptr);
-    snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "FEEDBACK_USER_INFO\t%s\n",
-             cfg->feedback_user_info == NULL ? "not_set" : cfg->feedback_user_info);
-    data_ptr += strlen(data_ptr);
-    snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "VERSION\t%s\n", MAXSCALE_VERSION);
-    data_ptr += strlen(data_ptr);
-    snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN * 2, "NOW\t%lu\nPRODUCT\t%s\n", now, "maxscale");
-    data_ptr += strlen(data_ptr);
-    snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "Uname_sysname\t%s\n", cfg->sysname);
-    data_ptr += strlen(data_ptr);
-    snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "Uname_distribution\t%s\n", cfg->release_info);
-    data_ptr += strlen(data_ptr);
+    MXS_NOTICE(dest_url_format, hex_setup_info,
+             MAXSCALE_VERSION, fb->release_info, modlist, get_processor_count(),
+             get_available_memory(), server_count_servers(), service_count_services(),
+             filter_count_filters());
+}
 
-    while (ptr)
-    {
-        snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN * 2,
-                 "module_%s_type\t%s\nmodule_%s_version\t%s\n",
-                 ptr->module, ptr->type, ptr->module, ptr->version);
-        data_ptr += strlen(data_ptr);
+bool feedback_not_submitted()
+{
+    char feedback_file[PATH_MAX];
+    sprintf(feedback_file, "%s/.feedback_submitted", get_datadir());
 
-        if (ptr->info)
-        {
-            snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "module_%s_api\t%d.%d.%d\n",
-                     ptr->module,
-                     ptr->info->api_version.major,
-                     ptr->info->api_version.minor,
-                     ptr->info->api_version.patch);
-
-            data_ptr += strlen(data_ptr);
-            snprintf(data_ptr, _NOTIFICATION_REPORT_ROW_LEN, "module_%s_releasestatus\t%s\n",
-                     ptr->module,
-                     ptr->info->status == MODULE_IN_DEVELOPMENT
-                     ? "In Development"
-                     : (ptr->info->status == MODULE_ALPHA_RELEASE
-                        ? "Alpha"
-                        : (ptr->info->status == MODULE_BETA_RELEASE
-                           ? "Beta"
-                           : (ptr->info->status == MODULE_GA
-                              ? "GA"
-                              : (ptr->info->status == MODULE_EXPERIMENTAL
-                                 ? "Experimental" : "Unknown")))));
-            data_ptr += strlen(data_ptr);
-        }
-        ptr = ptr->next;
-    }
-
-    return 1;
+    return access(feedback_file, F_OK);
 }
 
 /**

@@ -74,6 +74,8 @@
 #include <maxscale/utils.h>
 #include <maxscale/version.h>
 
+#include "maxscale/notification.h"
+
 #define STRING_BUFFER_SIZE 1024
 #define PIDFD_CLOSED -1
 
@@ -1812,6 +1814,8 @@ int main(int argc, char **argv)
         rc = MAXSCALE_BADCONFIG;
         goto return_main;
     }
+
+    module_log_feedback_report();
 
     GATEWAY_CONF* cnf = config_get_global_options();
     ss_dassert(cnf);

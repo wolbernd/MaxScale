@@ -120,6 +120,7 @@ int filter_standard_parameter(char *);
 void dprintAllFilters(DCB *);
 void dprintFilter(DCB *, FILTER_DEF *);
 void dListFilters(DCB *);
+int filter_count_filters();
 
 /**
  * Specifies capabilities specific for filters. Common capabilities

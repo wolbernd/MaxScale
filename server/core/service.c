@@ -535,8 +535,6 @@ serviceStartAll()
     int n = 0, i;
     bool error = false;
 
-    config_enable_feedback_task();
-
     ptr = allServices;
     while (ptr && !ptr->svc_do_shutdown)
     {
@@ -2124,4 +2122,21 @@ static void service_calculate_weights(SERVICE *service)
             }
         }
     }
+}
+
+int service_count_services()
+{
+    int i = 0;
+
+    spinlock_acquire(&service_spin);
+    SERVICE *service = allServices;
+
+    while (service)
+    {
+        i++;
+        service = service->next;
+    }
+
+    spinlock_release(&service_spin);
+    return i;
 }

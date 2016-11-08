@@ -1054,3 +1054,18 @@ long get_processor_count()
 #endif
     return processors;
 }
+
+/**
+ * Return the total amount of memory in megabytes
+ * @return Total amount of memory in megabytes
+ */
+long get_available_memory()
+{
+    long memory = 0;
+#if defined(_SC_PHYS_PAGES) && defined(_SC_PAGE_SIZE)
+    memory = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE) / (1024 * 1024);
+#else
+#error _SC_PHYS_PAGES and _SC_PAGE_SIZE are not available
+#endif
+    return memory;
+}

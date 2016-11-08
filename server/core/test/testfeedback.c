@@ -98,7 +98,6 @@ int main(int argc, char** argv)
     }
 
     config_load(cnf);
-    config_enable_feedback_task();
     if ((fc = config_get_feedback_data()) == NULL)
     {
         FAILTEST("Configuration for Feedback was NULL.");
@@ -107,7 +106,7 @@ int main(int argc, char** argv)
 
     regcomp(&re, fc->feedback_user_info, 0);
 
-    module_create_feedback_report(&buf, NULL, fc);
+    module_log_feedback_report(&buf, NULL, fc);
 
     if (regexec(&re, (char*)buf->start, 0, NULL, 0))
     {

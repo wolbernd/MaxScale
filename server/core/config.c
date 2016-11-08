@@ -345,11 +345,7 @@ ini_handler(void *userdata, const char *section, const char *name, const char *v
     {
         return handle_global_item(name, value);
     }
-    else if (strcasecmp(section, "feedback") == 0)
-    {
-        return handle_feedback_item(name, value);
-    }
-    else if (strlen(section) == 0)
+   else if (strlen(section) == 0)
     {
         MXS_ERROR("Parameter '%s=%s' declared outside a section.", name, value);
         return 0;
@@ -2149,7 +2145,8 @@ config_get_release_string(char* release)
 
             for (k = 0; k < found.gl_pathc; k++)
             {
-                if (strcmp(found.gl_pathv[k], "/etc/lsb-release") == 0)
+                if (strcmp(found.gl_pathv[k], "/etc/lsb-release") == 0 ||
+                    strcmp(found.gl_pathv[k], "/etc/os-release") == 0)
                 {
                     skipindex = k;
                 }
@@ -2195,64 +2192,22 @@ config_get_release_string(char* release)
 
     if (have_distribution)
     {
+        /** Replace non-alphanumeric characters with hyphens */
+        char *space = release;
+        while (*space)
+        {
+            if (!isalnum(*space))
+            {
+                *space = '-';
+            }
+            space++;
+        }
         return 1;
     }
     else
     {
         return 0;
     }
-}
-
-/**
- * Add the 'send_feedback' task to the task list
- */
-void
-config_enable_feedback_task(void)
-{
-    FEEDBACK_CONF *cfg = config_get_feedback_data();
-    int url_set = 0;
-    int user_info_set = 0;
-    int enable_set = cfg->feedback_enable;
-
-    url_set = cfg->feedback_url != NULL && strlen(cfg->feedback_url);
-    user_info_set = cfg->feedback_user_info != NULL && strlen(cfg->feedback_user_info);
-
-    if (enable_set && url_set && user_info_set)
-    {
-        /* Add the task to the tasl list */
-        if (hktask_add("send_feedback", module_feedback_send, cfg, cfg->feedback_frequency))
-        {
-            MXS_NOTICE("Notification service feedback task started: URL=%s, User-Info=%s, "
-                       "Frequency %u seconds",
-                       cfg->feedback_url,
-                       cfg->feedback_user_info,
-                       cfg->feedback_frequency);
-        }
-    }
-    else
-    {
-        if (enable_set)
-        {
-            MXS_ERROR("Notification service feedback cannot start: feedback_enable=1 but"
-                      " some required parameters are not set: %s%s%s",
-                      url_set == 0 ? "feedback_url is not set" : "",
-                      (user_info_set == 0 && url_set == 0) ? ", " : "",
-                      user_info_set == 0 ? "feedback_user_info is not set" : "");
-        }
-        else
-        {
-            MXS_INFO("Notification service feedback is not enabled.");
-        }
-    }
-}
-
-/**
- * Remove the 'send_feedback' task
- */
-void
-config_disable_feedback_task(void)
-{
-    hktask_remove("send_feedback");
 }
 
 unsigned long config_get_gateway_id()

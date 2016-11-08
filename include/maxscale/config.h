@@ -131,8 +131,6 @@ typedef struct
 
 char*               config_clean_string_list(const char* str);
 CONFIG_PARAMETER*   config_clone_param(const CONFIG_PARAMETER* param);
-void                config_enable_feedback_task(void);
-void                config_disable_feedback_task(void);
 unsigned long       config_get_gateway_id(void);
 GATEWAY_CONF*       config_get_global_options();
 CONFIG_PARAMETER*   config_get_param(CONFIG_PARAMETER* params, const char* name);
