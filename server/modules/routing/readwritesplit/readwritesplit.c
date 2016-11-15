@@ -1346,9 +1346,10 @@ static route_target_t get_route_target(ROUTER_CLIENT_SES *rses,
      */
     else if (!load_active &&
              (QUERY_IS_TYPE(qtype, QUERY_TYPE_SESSION_WRITE) ||
-              /** Configured to allow writing variables to all nodes */
+              /** Configured to allow writing user variables to all nodes */
               (use_sql_variables_in == TYPE_ALL &&
-               QUERY_IS_TYPE(qtype, QUERY_TYPE_GSYSVAR_WRITE)) ||
+               QUERY_IS_TYPE(qtype, QUERY_TYPE_USERVAR_WRITE)) ||
+              QUERY_IS_TYPE(qtype, QUERY_TYPE_GSYSVAR_WRITE) ||
               /** enable or disable autocommit are always routed to all */
               QUERY_IS_TYPE(qtype, QUERY_TYPE_ENABLE_AUTOCOMMIT) ||
               QUERY_IS_TYPE(qtype, QUERY_TYPE_DISABLE_AUTOCOMMIT)))
@@ -1406,10 +1407,10 @@ static route_target_t get_route_target(ROUTER_CLIENT_SES *rses,
             (QUERY_IS_TYPE(qtype, QUERY_TYPE_READ) ||
              QUERY_IS_TYPE(qtype, QUERY_TYPE_SHOW_TABLES) || /*< 'SHOW TABLES' */
              /** Configured to allow reading variables from slaves */
-             (use_sql_variables_in == TYPE_ALL &&
-              (QUERY_IS_TYPE(qtype, QUERY_TYPE_USERVAR_READ) ||
+             ((use_sql_variables_in == TYPE_ALL &&
+              QUERY_IS_TYPE(qtype, QUERY_TYPE_USERVAR_READ)) ||
                QUERY_IS_TYPE(qtype, QUERY_TYPE_SYSVAR_READ) ||
-               QUERY_IS_TYPE(qtype, QUERY_TYPE_GSYSVAR_READ)))))
+               QUERY_IS_TYPE(qtype, QUERY_TYPE_GSYSVAR_READ))))
         {
             target = TARGET_SLAVE;
         }
@@ -1419,9 +1420,9 @@ static route_target_t get_route_target(ROUTER_CLIENT_SES *rses,
             QUERY_IS_TYPE(qtype, QUERY_TYPE_PREPARE_STMT) ||
             QUERY_IS_TYPE(qtype, QUERY_TYPE_PREPARE_NAMED_STMT) ||
             /** Configured not to allow reading variables from slaves */
-            (use_sql_variables_in == TYPE_MASTER &&
-             (QUERY_IS_TYPE(qtype, QUERY_TYPE_USERVAR_READ) ||
-              QUERY_IS_TYPE(qtype, QUERY_TYPE_SYSVAR_READ))))
+            ((use_sql_variables_in == TYPE_MASTER &&
+             QUERY_IS_TYPE(qtype, QUERY_TYPE_USERVAR_READ)) ||
+              QUERY_IS_TYPE(qtype, QUERY_TYPE_SYSVAR_READ)))
         {
             target = TARGET_MASTER;
         }
