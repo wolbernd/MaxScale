@@ -15,8 +15,9 @@
  */
 
 #include <maxscale/cdefs.h>
-#include <limits.h>
+#include <stdint.h>
 #include <exception>
+#include <limits.h>
 #include <tr1/functional>
 #include <maxscale/hashtable.h>
 #include <maxscale/spinlock.h>
